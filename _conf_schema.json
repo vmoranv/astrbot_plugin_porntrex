@@ -1,0 +1,14 @@
+{
+    "proxy": {
+        "description": "代理地址",
+        "type": "string",
+        "hint": "如 http://127.0.0.1:7890",
+        "default": ""
+    },
+    "blur_level": {
+        "description": "图片打码程度",
+        "type": "int",
+        "hint": "0-100，0为不打码",
+        "default": 20
+    }
+}
