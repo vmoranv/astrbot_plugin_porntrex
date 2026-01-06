@@ -8,7 +8,6 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import AstrBotConfig
 import astrbot.api.message_components as Comp
 from porntrex_api import Client
-from base_api.base import BaseCore
 
 BASE_VIDEO_URL = "https://www.porntrex.com/video/"
 BASE_MODEL_URL = "https://www.porntrex.com/models/"
@@ -23,12 +22,7 @@ class PorntrexPlugin(Star):
         os.makedirs(CACHE_DIR, exist_ok=True)
 
     def _get_client(self) -> Client:
-        proxy = self.config.get("proxy", "")
-        if proxy:
-            core = BaseCore(proxies={"http": proxy, "https": proxy})
-        else:
-            core = BaseCore()
-        return Client(core=core)
+        return Client()
 
     def _clean_cache(self):
         for f in glob.glob(os.path.join(CACHE_DIR, "*")):
@@ -84,9 +78,24 @@ class PorntrexPlugin(Star):
             if not video_url.startswith("http"):
                 video_url = await self._resolve_video_url(video_url)
             logger.info(f"[porntrex] 最终请求URL: {video_url}")
+            
+            # 先用 aiohttp 测试网站是否可访问
+            proxy = self.config.get("proxy", "")
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            async with aiohttp.ClientSession() as session:
+                async with session.get(video_url, proxy=proxy if proxy else None, headers=headers) as resp:
+                    test_html = await resp.text()
+                    logger.info(f"[porntrex] aiohttp测试 - 状态: {resp.status}, HTML长度: {len(test_html)}")
+                    logger.info(f"[porntrex] aiohttp测试 - HTML前500字符: {test_html[:500]}")
+                    if "video-info" in test_html:
+                        logger.info("[porntrex] aiohttp测试 - 找到 video-info 元素")
+                    else:
+                        logger.info("[porntrex] aiohttp测试 - 未找到 video-info 元素")
+            
             client = self._get_client()
             video = client.get_video(video_url)
-            logger.info(f"[porntrex] 视频标题: {video.title}")
+            logger.info(f"[porntrex] 库获取 - HTML长度: {len(video.html_content)}")
+            logger.info(f"[porntrex] 库获取 - HTML前500字符: {video.html_content[:500]}")
             thumb_path = await self._blur_image(video.thumbnail)
             info = (
                 f"标题: {video.title}\n"
